@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLB Viewer — 3D Model Explorer</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Azeret+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+
+  <!--
+    Three.js Import Map
+    Maps bare "three" and "three/addons/" to the jsDelivr CDN.
+    Pin to a specific version for stability.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three":          "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+      "three/addons/":  "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="header">
+
+    <div class="logo">
+      <!-- 3-D cube icon -->
+      <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+        <path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>
+        <path d="M12 2v20M2 7l10 5 10-5"/>
+      </svg>
+      <span class="logo-text">GLB<em>Viewer</em></span>
+    </div>
+
+    <!-- Model metadata (hidden until a model is loaded) -->
+    <div class="model-meta" id="modelMeta">
+      <div class="meta-item">
+        <span class="meta-label">FILE</span>
+        <span class="meta-value" id="metaName">—</span>
+      </div>
+      <div class="meta-sep"></div>
+      <div class="meta-item">
+        <span class="meta-label">MESHES</span>
+        <span class="meta-value" id="metaMeshes">—</span>
+      </div>
+      <div class="meta-sep"></div>
+      <div class="meta-item">
+        <span class="meta-label">VERTICES</span>
+        <span class="meta-value" id="metaVerts">—</span>
+      </div>
+      <div class="meta-sep"></div>
+      <div class="meta-item">
+        <span class="meta-label">MATERIALS</span>
+        <span class="meta-value" id="metaMats">—</span>
+      </div>
+    </div>
+
+    <button class="header-load-btn" id="uploadNewBtn" title="Load a new GLB file">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.2">
+        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      Load Model
+    </button>
+
+  </header>
+
+  <!-- ── Viewport ───────────────────────────────────────────── -->
+  <main class="viewport" id="viewport">
+
+    <!-- Three.js renders onto this canvas -->
+    <canvas id="canvas"></canvas>
+
+    <!-- Upload zone (shown when no model is loaded) -->
+    <div class="upload-zone" id="uploadZone">
+      <div class="upload-card">
+        <!-- Top accent line (CSS ::before) -->
+
+        <div class="upload-icon-wrap">
+          <!-- Animated 3-D cube -->
+          <svg width="72" height="72" viewBox="0 0 64 64" fill="none"
+               stroke="currentColor" stroke-width="1.4" stroke-linejoin="round">
+            <path d="M32 6L6 20v24l26 14 26-14V20L32 6z"/>
+            <path d="M32 6v52"/>
+            <path d="M6 20l26 14 26-14"/>
+            <path d="M6 32l26 14 26-14"/>
+            <path d="M6 44l26 14 26-14"/>
+          </svg>
+        </div>
+
+        <h1 class="upload-heading">Drop your GLB here</h1>
+        <p class="upload-sub">or click the button to browse</p>
+
+        <div class="feature-tags">
+          <span class="ftag">360° Rotate</span>
+          <span class="ftag">Zoom</span>
+          <span class="ftag">Pan</span>
+          <span class="ftag">Wireframe</span>
+          <span class="ftag">Auto-Spin</span>
+          <span class="ftag">Screenshot</span>
+        </div>
+
+        <button class="upload-btn" id="uploadBtn">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2.2">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+            <polyline points="17 8 12 3 7 8"/>
+            <line x1="12" y1="3" x2="12" y2="15"/>
+          </svg>
+          Choose .glb File
+        </button>
+
+        <p class="upload-footnote">Supports standard &amp; DRACO-compressed GLB</p>
+      </div>
+    </div>
+
+    <!-- Loading overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+      <div class="loading-inner">
+        <div class="spin-ring"></div>
+        <svg class="spin-icon" width="22" height="22" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+          <path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>
+          <path d="M12 2v20M2 7l10 5 10-5"/>
+        </svg>
+        <p class="loading-label" id="loadingLabel">Preparing…</p>
+      </div>
+    </div>
+
+    <!-- Drag-over overlay (shown when dragging any file over the window) -->
+    <div class="drag-overlay" id="dragOverlay">
+      <div class="drag-box">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">
+          <path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>
+          <path d="M12 2v20M2 7l10 5 10-5"/>
+        </svg>
+        <span>Drop to load</span>
+      </div>
+    </div>
+
+    <!-- Controls hint (auto-fades after 4 s) -->
+    <div class="hint-bar" id="hintBar">
+      <span class="hint-key">L-Drag</span> Rotate
+      &nbsp;·&nbsp;
+      <span class="hint-key">Scroll</span> Zoom
+      &nbsp;·&nbsp;
+      <span class="hint-key">R-Drag</span> Pan
+    </div>
+
+  </main>
+
+  <!-- ── Toolbar ────────────────────────────────────────────── -->
+  <footer class="toolbar" id="toolbar">
+
+    <div class="tool-group">
+
+      <button class="tool-btn" id="btnAutoRotate" title="Toggle auto-rotate">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8">
+          <path d="M20 11A8 8 0 009.5 3.49"/>
+          <path d="M4 13a8 8 0 0014 4.97"/>
+          <polyline points="23 11 20 8 17 11"/>
+          <polyline points="1 13 4 16 7 13"/>
+        </svg>
+        <span>Auto Rotate</span>
+      </button>
+
+      <button class="tool-btn" id="btnWireframe" title="Toggle wireframe">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8">
+          <path d="M12 2L2 7v10l10 5 10-5V7L12 2z"/>
+          <path d="M12 2v20M2 7l10 5 10-5"/>
+        </svg>
+        <span>Wireframe</span>
+      </button>
+
+      <button class="tool-btn" id="btnGrid" title="Toggle ground grid">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8">
+          <rect x="3" y="3" width="7" height="7" rx="1"/>
+          <rect x="14" y="3" width="7" height="7" rx="1"/>
+          <rect x="3" y="14" width="7" height="7" rx="1"/>
+          <rect x="14" y="14" width="7" height="7" rx="1"/>
+        </svg>
+        <span>Grid</span>
+      </button>
+
+    </div>
+
+    <div class="tool-divider"></div>
+
+    <div class="tool-group">
+
+      <button class="tool-btn" id="btnFit" title="Fit camera to model">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>
+        </svg>
+        <span>Fit View</span>
+      </button>
+
+      <button class="tool-btn" id="btnScreenshot" title="Save screenshot as PNG">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="1.8">
+          <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+          <circle cx="12" cy="13" r="4"/>
+        </svg>
+        <span>Screenshot</span>
+      </button>
+
+    </div>
+
+  </footer>
+
+</div><!-- /.app -->
+
+<!-- Hidden file input — accepts only .glb -->
+<input type="file" id="fileInput" accept=".glb" style="display:none" />
+
+<!-- App entry point (ES module — must come AFTER the importmap) -->
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
